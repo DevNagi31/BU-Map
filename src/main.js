@@ -340,10 +340,11 @@ const LABEL_HEX = {
   utility:          '#dddddd',
 };
 
-function makeLabel(text, type) {
+function makeLabel(code, name, type) {
   const canvas = document.createElement('canvas');
-  canvas.width = 320; canvas.height = 72;
+  canvas.width = 320; canvas.height = 88;
   const ctx = canvas.getContext('2d');
+  const accent = LABEL_HEX[type] || '#ffffff';
   // Pill background
   const rx = 12;
   ctx.beginPath();
@@ -356,28 +357,31 @@ function makeLabel(text, type) {
   ctx.lineTo(4, 4 + rx);
   ctx.arcTo(4, 4, 4 + rx, 4, rx);
   ctx.closePath();
-  ctx.fillStyle = 'rgba(0,0,0,0.72)';
+  ctx.fillStyle = 'rgba(0,0,0,0.78)';
   ctx.fill();
-  ctx.strokeStyle = (LABEL_HEX[type] || '#fff') + '80';
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = accent + '90';
+  ctx.lineWidth = 1.8;
   ctx.stroke();
-  ctx.font = 'bold 22px Arial, sans-serif';
+  // Building code — large + colored
   ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = LABEL_HEX[type] || '#ffffff';
-  // Shrink font if text would overflow the pill
-  const maxTextW = canvas.width - 20;
-  let fontSize = 22;
-  while (ctx.measureText(text).width > maxTextW && fontSize > 11) {
-    fontSize -= 1;
-    ctx.font = `bold ${fontSize}px Arial, sans-serif`;
-  }
-  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = accent;
+  ctx.font = 'bold 30px Arial, sans-serif';
+  ctx.fillText(code, canvas.width / 2, 46);
+  // Building name — smaller white
+  ctx.fillStyle = 'rgba(255,255,255,0.70)';
+  ctx.font = '15px Arial, sans-serif';
+  const maxW = canvas.width - 20;
+  let sub = name;
+  ctx.font = '15px Arial, sans-serif';
+  while (ctx.measureText(sub).width > maxW && sub.length > 4) sub = sub.slice(0, -1);
+  if (sub !== name) sub = sub.trimEnd() + '…';
+  ctx.fillText(sub, canvas.width / 2, 68);
   const tex = new THREE.CanvasTexture(canvas);
   const sprite = new THREE.Sprite(
     new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false })
   );
-  sprite.scale.set(16, 4, 1);
+  sprite.scale.set(18, 5, 1);
   return sprite;
 }
 
@@ -407,11 +411,12 @@ const hvacGrayMat = new THREE.MeshStandardMaterial({ color: 0x8a8a8a, roughness:
 
 // ─── Procedural brick / stone wall texture ────────────────────────────────────
 const brickBaseCache = {};
-function getBrickTex(type) {
-  if (brickBaseCache[type]) return brickBaseCache[type];
-  const c   = new THREE.Color(TYPE_COLORS[type] || 0x888888);
+function getBrickTex(type, colorHex, isStoneOverride) {
+  const cacheKey = colorHex != null ? `c_${colorHex}` : type;
+  if (brickBaseCache[cacheKey]) return brickBaseCache[cacheKey];
+  const c   = new THREE.Color(colorHex != null ? colorHex : (TYPE_COLORS[type] || 0x888888));
   const br  = (c.r * 255) | 0, bg = (c.g * 255) | 0, bb = (c.b * 255) | 0;
-  const isStone = type === 'library' || type === 'utility';
+  const isStone = isStoneOverride != null ? isStoneOverride : (type === 'library' || type === 'utility');
   const cv  = document.createElement('canvas');
   cv.width  = 512; cv.height = 512;
   const ctx = cv.getContext('2d');
@@ -438,7 +443,7 @@ function getBrickTex(type) {
   ctx.fillRect(0, 0, 5, 512); ctx.fillRect(507, 0, 5, 512);
   const tex = new THREE.CanvasTexture(cv);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  brickBaseCache[type] = tex;
+  brickBaseCache[cacheKey] = tex;
   return tex;
 }
 
@@ -453,9 +458,9 @@ processBuildings().forEach((b) => {
   const floors  = Math.max(2, Math.round(b.h / 4));
   const floorH  = b.h / floors;
 
-  const wallColor = new THREE.Color(TYPE_COLORS[b.type] || 0x888888);
+  const wallColor = new THREE.Color(b.color != null ? b.color : (TYPE_COLORS[b.type] || 0x888888));
   // Clone base brick texture and set UV repeat proportional to building size
-  const brickBase = getBrickTex(b.type);
+  const brickBase = getBrickTex(b.type, b.color, b.stone);
   const wallTex   = brickBase.clone();
   wallTex.repeat.set(Math.max(2, Math.round(bw / 15)), Math.max(1, Math.round(b.h / 8)));
   wallTex.needsUpdate = true;
@@ -509,6 +514,33 @@ processBuildings().forEach((b) => {
     }
   }
 
+  // ── Library Tower: brutalist stepped top (iconic BU skyline silhouette) ─────
+  if (b.code === 'LN' || b.code === 'LT') {
+    // Wide dark concrete band just below roof
+    const band = new THREE.Mesh(new THREE.BoxGeometry(bw + 1.2, 2.0, bd + 1.2), slabMat);
+    band.position.set(b.cx, b.h - 1.0, b.cz);
+    band.castShadow = true; scene.add(band);
+    // Step 1 — 80% width
+    const step1 = new THREE.Mesh(new THREE.BoxGeometry(bw * 0.80, 6, bd * 0.80), wallMat);
+    step1.position.set(b.cx, b.h + 3, b.cz);
+    step1.castShadow = true; scene.add(step1);
+    const band2 = new THREE.Mesh(new THREE.BoxGeometry(bw * 0.82, 1.5, bd * 0.82), slabMat);
+    band2.position.set(b.cx, b.h + 6.75, b.cz); scene.add(band2);
+    // Step 2 — 55% width (top pinnacle)
+    const step2 = new THREE.Mesh(new THREE.BoxGeometry(bw * 0.55, 5, bd * 0.55), wallMat);
+    step2.position.set(b.cx, b.h + 9.5, b.cz);
+    step2.castShadow = true; scene.add(step2);
+  }
+
+  // ── Events Center: low barrel-vault roof suggestion ───────────────────────
+  if (b.code === 'EC') {
+    const vaultMat = new THREE.MeshStandardMaterial({ color: 0x7888a0, roughness: 0.5, metalness: 0.45 });
+    // Slight arched ridge along the long axis — simulated with a raised center box
+    const ridge = new THREE.Mesh(new THREE.BoxGeometry(bw * 0.35, 2.5, bd), vaultMat);
+    ridge.position.set(b.cx, b.h + 1.25, b.cz);
+    ridge.castShadow = true; scene.add(ridge);
+  }
+
   // ── 3-D windows — collected for InstancedMesh (built after loop) ───────────
   const WIN_SPACING = 13.5;
   const WIN_H       = floorH * 0.55;
@@ -542,7 +574,7 @@ processBuildings().forEach((b) => {
   }
 
   // Floating label at centroid
-  const label = makeLabel(b.label, b.type);
+  const label = makeLabel(b.code, b.label, b.type);
   label.position.set(b.cx, b.h + 7, b.cz);
   scene.add(label);
 
