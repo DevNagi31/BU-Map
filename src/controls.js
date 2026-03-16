@@ -1,101 +1,85 @@
-// Orbit + pan controls for the campus map camera
-// Left-drag: orbit, Right-drag: pan, Scroll: zoom
+// 2.5D isometric controls — pan + zoom only (no orbit)
+// Fixed camera angle looking from the SW at ~30° elevation
 
 export function createControls(camera, domElement) {
   let enabled = true;
 
-  const state = {
-    isOrbiting: false,
-    isPanning: false,
-    lastX: 0,
-    lastY: 0,
-    // Spherical coords
-    theta: -0.45,  // azimuth — slight angle from SW
-    phi: 0.75,     // polar — fairly high so you see the full oval
-    radius: 260,
-    // Target — center of campus oval
-    targetX: 0,
-    targetY: 0,
-    targetZ: -20,
-  };
+  // Orthographic zoom level (half-frustum height in world units)
+  let zoom = 180;
+  let targetZoom = 180;
+  const MIN_ZOOM = 30;
+  const MAX_ZOOM = 420;
 
-  const MIN_PHI = 0.25;
-  const MAX_PHI = 1.35;
-  const MIN_RADIUS = 30;
-  const MAX_RADIUS = 320;
+  // Camera target (point on the ground the camera looks at)
+  let targetX = -20;
+  let targetZ = -60;
+
+  // Fixed isometric angle
+  const AZIMUTH = -Math.PI / 4.5;  // ~SW direction
+  const ELEVATION = Math.PI / 5.5;  // ~33° above horizon
+  const CAM_DIST = 800;  // far enough to see everything in ortho
+
+  const sinAz = Math.sin(AZIMUTH);
+  const cosAz = Math.cos(AZIMUTH);
+  const sinEl = Math.sin(ELEVATION);
+  const cosEl = Math.cos(ELEVATION);
 
   function updateCamera() {
-    const sinPhi = Math.sin(state.phi);
-    const cosPhi = Math.cos(state.phi);
-    const sinTheta = Math.sin(state.theta);
-    const cosTheta = Math.cos(state.theta);
+    const aspect = window.innerWidth / window.innerHeight;
+    camera.left   = -zoom * aspect;
+    camera.right  =  zoom * aspect;
+    camera.top    =  zoom;
+    camera.bottom = -zoom;
+    camera.updateProjectionMatrix();
 
-    camera.position.x = state.targetX + state.radius * sinPhi * sinTheta;
-    camera.position.y = state.targetY + state.radius * cosPhi;
-    camera.position.z = state.targetZ + state.radius * sinPhi * cosTheta;
-
-    camera.lookAt(state.targetX, state.targetY, state.targetZ);
+    camera.position.set(
+      targetX + CAM_DIST * cosEl * sinAz,
+      CAM_DIST * sinEl,
+      targetZ + CAM_DIST * cosEl * cosAz
+    );
+    camera.lookAt(targetX, 0, targetZ);
   }
+
+  // ─── Mouse interaction state ────────────────────────────────────────
+  let isPanning = false;
+  let lastX = 0, lastY = 0;
 
   function onMouseDown(e) {
     if (!enabled) return;
-    if (e.button === 0) {
-      state.isOrbiting = true;
-    } else if (e.button === 2) {
-      state.isPanning = true;
-    }
-    state.lastX = e.clientX;
-    state.lastY = e.clientY;
+    isPanning = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
   }
 
   function onMouseMove(e) {
-    if (!enabled) return;
-    const dx = e.clientX - state.lastX;
-    const dy = e.clientY - state.lastY;
-    state.lastX = e.clientX;
-    state.lastY = e.clientY;
+    if (!enabled || !isPanning) return;
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    lastX = e.clientX;
+    lastY = e.clientY;
 
-    if (state.isOrbiting) {
-      state.theta -= dx * 0.005;
-      state.phi = Math.max(MIN_PHI, Math.min(MAX_PHI, state.phi + dy * 0.005));
-      updateCamera();
-    } else if (state.isPanning) {
-      // Pan in the camera's local XZ plane
-      const panSpeed = state.radius * 0.0012;
-      const sinTheta = Math.sin(state.theta);
-      const cosTheta = Math.cos(state.theta);
+    // Pan speed scales with zoom level
+    const panSpeed = (zoom * 2) / window.innerHeight;
 
-      // Right vector (perpendicular to view, in XZ plane)
-      state.targetX -= cosTheta * dx * panSpeed;
-      state.targetZ += sinTheta * dx * panSpeed;
+    // Project screen-space drag into isometric world space
+    // Screen right → world right (perpendicular to camera forward in XZ)
+    // Screen up → world forward (toward camera, projected onto XZ)
+    targetX -= (cosAz * dx + sinAz * cosEl * dy) * panSpeed;
+    targetZ += (sinAz * dx - cosAz * cosEl * dy) * panSpeed;
 
-      // Up-projected forward vector
-      const sinPhi = Math.sin(state.phi);
-      const cosPhi = Math.cos(state.phi);
-      state.targetX += sinTheta * cosPhi * dy * panSpeed;
-      state.targetZ += cosTheta * cosPhi * dy * panSpeed;
-      state.targetY += sinPhi * dy * panSpeed * 0.5;
-
-      updateCamera();
-    }
-  }
-
-  function onMouseUp() {
-    state.isOrbiting = false;
-    state.isPanning = false;
-  }
-
-  function onWheel(e) {
-    if (!enabled) { e.preventDefault(); return; }
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 1.1 : 0.9;
-    state.radius = Math.max(MIN_RADIUS, Math.min(MAX_RADIUS, state.radius * delta));
     updateCamera();
   }
 
-  function onContextMenu(e) {
+  function onMouseUp() { isPanning = false; }
+
+  function onWheel(e) {
+    if (!enabled) return;
     e.preventDefault();
+    const factor = e.deltaY > 0 ? 1.08 : 0.92;
+    targetZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, targetZoom * factor));
   }
+
+  function onContextMenu(e) { e.preventDefault(); }
 
   domElement.addEventListener('mousedown', onMouseDown);
   window.addEventListener('mousemove', onMouseMove);
@@ -103,16 +87,17 @@ export function createControls(camera, domElement) {
   domElement.addEventListener('wheel', onWheel, { passive: false });
   domElement.addEventListener('contextmenu', onContextMenu);
 
-  // Touch support
+  // ─── Touch ──────────────────────────────────────────────────────────
   let lastTouchDist = 0;
+  let lastTouchX = 0, lastTouchZ = 0;
 
   function onTouchStart(e) {
     if (e.touches.length === 1) {
-      state.isOrbiting = true;
-      state.lastX = e.touches[0].clientX;
-      state.lastY = e.touches[0].clientY;
+      isPanning = true;
+      lastX = e.touches[0].clientX;
+      lastY = e.touches[0].clientY;
     } else if (e.touches.length === 2) {
-      state.isOrbiting = false;
+      isPanning = false;
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       lastTouchDist = Math.hypot(dx, dy);
@@ -121,51 +106,59 @@ export function createControls(camera, domElement) {
 
   function onTouchMove(e) {
     e.preventDefault();
-    if (e.touches.length === 1 && state.isOrbiting) {
-      const dx = e.touches[0].clientX - state.lastX;
-      const dy = e.touches[0].clientY - state.lastY;
-      state.lastX = e.touches[0].clientX;
-      state.lastY = e.touches[0].clientY;
-      state.theta -= dx * 0.006;
-      state.phi = Math.max(MIN_PHI, Math.min(MAX_PHI, state.phi + dy * 0.006));
+    if (e.touches.length === 1 && isPanning) {
+      const dx = e.touches[0].clientX - lastX;
+      const dy = e.touches[0].clientY - lastY;
+      lastX = e.touches[0].clientX;
+      lastY = e.touches[0].clientY;
+      const panSpeed = (zoom * 2) / window.innerHeight;
+      targetX -= (cosAz * dx + sinAz * cosEl * dy) * panSpeed;
+      targetZ += (sinAz * dx - cosAz * cosEl * dy) * panSpeed;
       updateCamera();
     } else if (e.touches.length === 2) {
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       const dist = Math.hypot(dx, dy);
-      const delta = lastTouchDist / dist;
-      state.radius = Math.max(MIN_RADIUS, Math.min(MAX_RADIUS, state.radius * delta));
+      const factor = lastTouchDist / dist;
+      targetZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, targetZoom * factor));
       lastTouchDist = dist;
-      updateCamera();
     }
   }
 
-  function onTouchEnd() {
-    state.isOrbiting = false;
-  }
+  function onTouchEnd() { isPanning = false; }
 
   domElement.addEventListener('touchstart', onTouchStart, { passive: false });
   domElement.addEventListener('touchmove', onTouchMove, { passive: false });
   domElement.addEventListener('touchend', onTouchEnd);
 
-  // Initial position
+  // ─── Smooth zoom interpolation (call every frame) ──────────────────
+  function update() {
+    if (Math.abs(zoom - targetZoom) > 0.2) {
+      zoom += (targetZoom - zoom) * 0.1;
+      updateCamera();
+    }
+  }
+
+  // Initial
   updateCamera();
 
+  // ─── flyTo animation ───────────────────────────────────────────────
   let flyAnimId = null;
 
   function flyTo(x, z) {
     if (flyAnimId) cancelAnimationFrame(flyAnimId);
-    const fromX = state.targetX, fromZ = state.targetZ;
-    const fromRadius = state.radius;
-    const toRadius = Math.max(MIN_RADIUS, Math.min(120, state.radius * 0.65));
+    const fromX = targetX, fromZ = targetZ;
+    const fromZoom = targetZoom;
+    const toZoom = Math.max(MIN_ZOOM, Math.min(80, targetZoom * 0.6));
     const t0 = performance.now();
-    const duration = 700;
+    const duration = 800;
     function step(now) {
       let t = Math.min(1, (now - t0) / duration);
       t = 1 - Math.pow(1 - t, 3); // ease-out cubic
-      state.targetX  = fromX      + (x        - fromX)      * t;
-      state.targetZ  = fromZ      + (z        - fromZ)      * t;
-      state.radius   = fromRadius + (toRadius - fromRadius) * t;
+      targetX = fromX + (x - fromX) * t;
+      targetZ = fromZ + (z - fromZ) * t;
+      targetZoom = fromZoom + (toZoom - fromZoom) * t;
+      zoom = targetZoom;
       updateCamera();
       if (t < 1) flyAnimId = requestAnimationFrame(step);
       else flyAnimId = null;
@@ -174,17 +167,16 @@ export function createControls(camera, domElement) {
   }
 
   return {
-    update: updateCamera,
+    update,
+    updateCamera,
     flyTo,
-    getTheta() { return state.theta; },
-    setEnabled(v) {
-      enabled = v;
-      if (!v) { state.isOrbiting = false; state.isPanning = false; }
-    },
+    getTarget() { return { x: targetX, z: targetZ }; },
+    getZoom() { return zoom; },
+    setEnabled(v) { enabled = v; if (!v) isPanning = false; },
     setTarget(x, z) {
       if (flyAnimId) { cancelAnimationFrame(flyAnimId); flyAnimId = null; }
-      state.targetX = x;
-      state.targetZ = z;
+      targetX = x;
+      targetZ = z;
       updateCamera();
     },
     dispose() {

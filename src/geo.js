@@ -97,13 +97,13 @@ const META = {
   PF:  { type:'utility',          h: 8, label:'Phys Fac',      desc:'Physical Facilities building for campus operations and maintenance.' },
   PFN: { type:'utility',          h: 8, label:'Phys Fac N',    desc:'Physical Facilities North annex.' },
   TC:  { type:'student_services', h:10, label:'The Commons',   desc:'The Commons dining and social hub in the central academic area.' },
-  UU:  { type:'student_services', h:14, label:'Union',         desc:'University Union — hub of student life with dining, student orgs, BingTV, game room, and the Underground.' },
+  UU:  { type:'student_services', h:14, color:0xb84020, label:'University Union', desc:'University Union — hub of student life with dining, student orgs, BingTV, game room, and the Underground.' },
   UUW: { type:'student_services', h:12, label:'Union West',    desc:'University Union West wing with additional meeting rooms and student services.' },
   // ── Athletics ─────────────────────────────────────
   EC:  { type:'athletics',        h:14, color:0x6a7880,          label:'Events Center',      desc:'6,000-seat Events Center — home of Binghamton Bearcats basketball, concerts, and commencement.' },
-  GE:  { type:'athletics',        h:14, label:'East Gym',      desc:'East Gym Recreation Center: courts, pool, fitness equipment, and group fitness classes.' },
-  RC:  { type:'athletics',        h:10, label:'Rockefeller',   desc:'Nelson A. Rockefeller Center with tennis courts, track, and field sports areas.' },
-  WG:  { type:'athletics',        h:12, label:'West Gym',      desc:'West Gymnasium with fitness facilities, courts, and practice spaces for Bearcat teams.' },
+  GE:  { type:'athletics',        h:14, color:0x5a6878,          label:'East Gym',           desc:'East Gym Recreation Center: courts, pool, fitness equipment, and group fitness classes.' },
+  RC:  { type:'athletics',        h:10,                          label:'Rockefeller Center',  desc:'Nelson A. Rockefeller Center with tennis courts, track, and field sports areas.' },
+  WG:  { type:'athletics',        h:12, color:0x5a6878,          label:'West Gym',            desc:'West Gymnasium with fitness facilities, courts, and practice spaces for Bearcat teams.' },
   SM:  { type:'athletics',        h: 8, label:'Stadium',       desc:'Stadium area supporting outdoor varsity athletics.' },
   // ── Residential ───────────────────────────────────
   AH:  { type:'residential',      h:14, label:'Adirondack',    desc:'Adirondack Hall — part of the Newing College residential community.' },
