@@ -374,6 +374,13 @@ map.on('load', () => {
     el.className = 'building-marker';
     el.innerHTML = `<span class="bm-code">${props.code}</span><span class="bm-name">${props.label}</span>`;
 
+    // Click label to open info panel
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showBuilding(props);
+      flyToBuilding(props.code);
+    });
+
     new maplibregl.Marker({ element: el, anchor: 'center' })
       .setLngLat([cx, cy])
       .addTo(map);
@@ -459,43 +466,39 @@ map.on('load', () => {
   // ── Building interactions ──
   let hoveredCode = null;
 
-  map.on('click', 'bu-buildings-3d', (e) => {
-    if (!e.features.length) return;
-    const props = e.features[0].properties;
-    showBuilding(props);
-    flyToBuilding(props.code);
-  });
-
-  map.on('mouseenter', 'bu-buildings-3d', () => {
-    map.getCanvas().style.cursor = 'pointer';
-  });
-
-  map.on('mousemove', 'bu-buildings-3d', (e) => {
-    if (!e.features.length) return;
-    const props = e.features[0].properties;
-    tooltip.style.display = 'block';
-    tooltip.style.left = `${e.point.x + 14}px`;
-    tooltip.style.top = `${e.point.y - 40}px`;
-    tooltip.innerHTML = `${props.name}<span class="tt-type">${TYPE_LABELS[props.btype] || props.btype}</span>`;
-    if (hoveredCode !== props.code) {
-      hoveredCode = props.code;
-      map.setPaintProperty('bu-buildings-3d', 'fill-extrusion-opacity', [
-        'case', ['==', ['get', 'code'], hoveredCode], 1.0, 0.88,
-      ]);
+  // Building click — use queryRenderedFeatures for reliable hit detection
+  map.on('click', (e) => {
+    const features = map.queryRenderedFeatures(e.point, { layers: ['bu-buildings-3d'] });
+    if (features.length) {
+      const props = features[0].properties;
+      showBuilding(props);
+      flyToBuilding(props.code);
+    } else {
+      closeInfoPanel();
     }
   });
 
-  map.on('mouseleave', 'bu-buildings-3d', () => {
-    map.getCanvas().style.cursor = '';
-    tooltip.style.display = 'none';
-    hoveredCode = null;
-    map.setPaintProperty('bu-buildings-3d', 'fill-extrusion-opacity', 0.88);
-  });
-
-  map.on('click', (e) => {
+  // Hover effects
+  map.on('mousemove', (e) => {
     const features = map.queryRenderedFeatures(e.point, { layers: ['bu-buildings-3d'] });
-    if (!features.length) {
-      closeInfoPanel();
+    if (features.length) {
+      const props = features[0].properties;
+      map.getCanvas().style.cursor = 'pointer';
+      tooltip.style.display = 'block';
+      tooltip.style.left = `${e.point.x + 14}px`;
+      tooltip.style.top = `${e.point.y - 40}px`;
+      tooltip.innerHTML = `${props.name}<span class="tt-type">${TYPE_LABELS[props.btype] || props.btype}</span>`;
+      if (hoveredCode !== props.code) {
+        hoveredCode = props.code;
+        map.setPaintProperty('bu-buildings-3d', 'fill-extrusion-opacity', [
+          'case', ['==', ['get', 'code'], hoveredCode], 1.0, 0.88,
+        ]);
+      }
+    } else if (hoveredCode) {
+      map.getCanvas().style.cursor = '';
+      tooltip.style.display = 'none';
+      hoveredCode = null;
+      map.setPaintProperty('bu-buildings-3d', 'fill-extrusion-opacity', 0.88);
     }
   });
 
