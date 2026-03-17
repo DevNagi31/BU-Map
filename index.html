@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BU Campus Map</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --glass: rgba(0, 48, 32, 0.88);
+      --glass-border: rgba(255,255,255,0.12);
+      --glass-hover: rgba(255,255,255,0.08);
+      --accent: #005A43;
+      --accent-bright: #4eca88;
+      --text-primary: rgba(255,255,255,0.95);
+      --text-secondary: rgba(255,255,255,0.6);
+      --text-muted: rgba(255,255,255,0.35);
+      --radius: 16px;
+      --radius-sm: 10px;
+      --blur: blur(24px);
+      --shadow: 0 8px 32px rgba(0,40,20,0.3), 0 2px 8px rgba(0,0,0,0.12);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #d4ecd8;
+      overflow: hidden;
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #map {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    /* ── Loading Screen ─────────────────────────────────────────────────── */
+    #loading {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(135deg, #003828 0%, #005A43 40%, #007858 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      transition: opacity 0.8s ease, visibility 0.8s;
+    }
+    #loading.done { opacity: 0; visibility: hidden; pointer-events: none; }
+
+    #loading .logo-big {
+      width: 80px; height: 80px;
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(12px);
+      border: 2px solid rgba(255,255,255,0.2);
+      border-radius: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 32px;
+      color: white;
+      margin-bottom: 28px;
+      box-shadow: 0 0 60px rgba(0,232,138,0.2);
+      animation: pulse-logo 2s ease-in-out infinite;
+    }
+    @keyframes pulse-logo {
+      0%, 100% { box-shadow: 0 0 60px rgba(0,232,138,0.2); transform: scale(1); }
+      50% { box-shadow: 0 0 80px rgba(0,232,138,0.35); transform: scale(1.05); }
+    }
+
+    #loading h2 {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      margin-bottom: 32px;
+    }
+
+    .loader-bar {
+      width: 180px;
+      height: 3px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .loader-bar .fill {
+      height: 100%;
+      width: 30%;
+      background: rgba(255,255,255,0.7);
+      border-radius: 3px;
+      animation: load-slide 1.2s ease-in-out infinite;
+    }
+    @keyframes load-slide {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(600%); }
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
+    #header {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 10px 24px 10px 14px;
+      background: var(--glass);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      border: 1px solid var(--glass-border);
+      border-radius: 999px;
+      box-shadow: var(--shadow);
+      z-index: 10;
+      pointer-events: none;
+      animation: fade-down 0.6s ease 0.8s both;
+    }
+    @keyframes fade-down {
+      from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
+    #header .logo {
+      width: 38px; height: 38px;
+      background: var(--accent);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 16px;
+      color: white;
+      flex-shrink: 0;
+    }
+
+    #header .header-text h1 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+    }
+
+    #header .header-text p {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Search ─────────────────────────────────────────────────────────── */
+    #search-box {
+      position: absolute;
+      top: 84px;
+      left: 24px;
+      width: 300px;
+      z-index: 20;
+      animation: fade-in 0.5s ease 1s both;
+    }
+    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+    #search-box .search-wrap {
+      position: relative;
+    }
+
+    #search-box .search-icon {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+      line-height: 1;
+    }
+    #search-box .search-icon svg {
+      width: 16px; height: 16px;
+      stroke: var(--text-muted);
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    #search-input {
+      width: 100%;
+      background: var(--glass);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      border: 1px solid var(--glass-border);
+      border-radius: 14px;
+      padding: 12px 48px 12px 44px;
+      color: var(--text-primary);
+      font-size: 14px;
+      font-family: inherit;
+      font-weight: 500;
+      outline: none;
+      transition: border-color 0.25s, box-shadow 0.25s;
+      box-shadow: var(--shadow);
+    }
+    #search-input::placeholder { color: var(--text-muted); font-weight: 400; }
+    #search-input:focus {
+      border-color: rgba(0,103,71,0.5);
+      box-shadow: var(--shadow), 0 0 0 3px rgba(0,103,71,0.12);
+    }
+
+    .search-shortcut {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: rgba(255,255,255,0.06);
+      padding: 3px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.06);
+      pointer-events: none;
+      letter-spacing: 0.02em;
+    }
+
+    #search-results {
+      display: none;
+      margin-top: 6px;
+      background: var(--glass);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      max-height: 320px;
+      overflow-y: auto;
+      box-shadow: var(--shadow);
+    }
+
+    .search-result-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 16px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      transition: background 0.15s;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+    .search-result-item:last-child { border-bottom: none; }
+    .search-result-item:hover { background: rgba(0,103,71,0.1); }
+
+    .result-type {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--accent-bright);
+      flex-shrink: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      background: rgba(0,201,120,0.08);
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+
+    /* ── Info Panel ──────────────────────────────────────────────────────── */
+    #info-panel {
+      position: absolute;
+      right: 24px;
+      top: 84px;
+      width: 320px;
+      background: var(--glass);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      color: white;
+      transform: translateX(360px);
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 20;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    #info-panel.visible { transform: translateX(0); }
+
+    .panel-accent-bar {
+      height: 3px;
+      background: var(--accent);
+      transition: background 0.3s;
+    }
+
+    .panel-content { padding: 20px 22px 22px; }
+
+    #info-panel .building-tag {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent-bright);
+      background: rgba(0,201,120,0.08);
+      padding: 4px 10px;
+      border-radius: 6px;
+      margin-bottom: 10px;
+    }
+
+    #info-panel h2 {
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1.25;
+      margin-bottom: 16px;
+      color: white;
+      letter-spacing: -0.02em;
+    }
+
+    #info-panel .divider {
+      height: 1px;
+      background: rgba(255,255,255,0.06);
+      margin: 14px 0;
+    }
+
+    .stats-row {
+      display: flex;
+      gap: 2px;
+    }
+    .stat-block {
+      flex: 1;
+      text-align: center;
+      padding: 10px 6px;
+      background: rgba(255,255,255,0.02);
+      border-radius: 8px;
+    }
+    .stat-block:first-child { border-radius: 8px 0 0 8px; }
+    .stat-block:last-child { border-radius: 0 8px 8px 0; }
+    .stat-icon {
+      font-size: 14px;
+      margin-bottom: 4px;
+      opacity: 0.5;
+    }
+    .stat-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .stat-label {
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-top: 2px;
+    }
+
+    #info-panel .description {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+      margin-top: 14px;
+    }
+
+    .panel-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .panel-actions button {
+      flex: 1;
+      padding: 12px 0;
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+    .btn-primary:hover { background: #007a54; }
+
+    #info-panel .close-btn {
+      position: absolute;
+      top: 18px;
+      right: 16px;
+      background: rgba(255,255,255,0.06);
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      width: 28px; height: 28px;
+      border-radius: 8px;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      pointer-events: all;
+      z-index: 2;
+    }
+    #info-panel .close-btn:hover {
+      background: rgba(255,255,255,0.12);
+      color: white;
+    }
+
+    /* ── Layers Panel ─────────────────────────────────────────────────────── */
+    #layers-panel {
+      position: absolute;
+      top: 140px;
+      left: 24px;
+      z-index: 15;
+      animation: fade-in 0.5s ease 1.2s both;
+    }
+
+    .layers-toggle-btn {
+      background: var(--glass);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      padding: 10px 16px;
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: var(--shadow);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    .layers-toggle-btn:hover { background: rgba(0, 48, 32, 0.95); }
+    .layers-toggle-btn .icon { font-size: 16px; opacity: 0.6; }
+
+    .layers-dropdown {
+      display: none;
+      margin-top: 6px;
+      background: var(--glass);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      padding: 10px 0;
+      box-shadow: var(--shadow);
+      min-width: 200px;
+    }
+    .layers-dropdown.open { display: block; }
+
+    .layers-dropdown h4 {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding: 4px 16px 8px;
+    }
+
+    .layer-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      cursor: pointer;
+      transition: background 0.15s;
+      user-select: none;
+    }
+    .layer-toggle:hover { background: rgba(255,255,255,0.04); }
+
+    .layer-toggle .layer-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .layer-toggle .layer-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .layer-toggle .layer-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .toggle-status {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.04);
+      color: var(--text-muted);
+    }
+
+    .layer-toggle.active .toggle-status {
+      background: rgba(0,201,120,0.12);
+      color: var(--accent-bright);
+    }
+
+    .layer-toggle.active .layer-name {
+      color: var(--text-primary);
+    }
+
+    /* ── Legend ──────────────────────────────────────────────────────────── */
+    #legend {
+      position: absolute;
+      left: 24px;
+      bottom: 28px;
+      background: var(--glass);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      padding: 14px 18px;
+      color: white;
+      z-index: 10;
+      box-shadow: var(--shadow);
+      animation: fade-in 0.5s ease 1.2s both;
+      transition: all 0.3s ease;
+    }
+
+    #legend h3 {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      transition: color 0.15s;
+    }
+    .legend-item:last-child { margin-bottom: 0; }
+    .legend-item:hover { color: var(--text-primary); }
+
+    .legend-color {
+      width: 12px; height: 12px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      box-shadow: 0 0 6px rgba(0,0,0,0.3);
+    }
+
+    /* ── Controls Hint ──────────────────────────────────────────────────── */
+    #controls-hint {
+      position: absolute;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 6px;
+      z-index: 10;
+      pointer-events: none;
+      animation: fade-in 0.5s ease 1.4s both;
+      transition: opacity 0.5s ease;
+    }
+
+    .hint-chip {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 7px 14px;
+      background: var(--glass);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      border: 1px solid var(--glass-border);
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .hint-chip .hint-key {
+      font-weight: 700;
+      color: var(--text-secondary);
+      font-size: 10px;
+      background: rgba(255,255,255,0.06);
+      padding: 1px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    /* ── Tooltip ─────────────────────────────────────────────────────────── */
+    #tooltip {
+      position: absolute;
+      background: var(--glass);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      color: white;
+      padding: 8px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      pointer-events: none;
+      z-index: 30;
+      display: none;
+      border: 1px solid var(--glass-border);
+      white-space: nowrap;
+      box-shadow: var(--shadow);
+      letter-spacing: -0.01em;
+    }
+    #tooltip .tt-type {
+      display: block;
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--accent-bright);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-top: 2px;
+    }
+
+    /* ── POI markers (parking, dining, bus) ─────────────────────────── */
+    .poi-marker {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: white;
+      font-size: 13px;
+      font-weight: 800;
+      font-family: 'Inter', sans-serif;
+      border: 2.5px solid white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      cursor: pointer;
+    }
+    .poi-parking { background: #7b4fbf; }
+    .poi-dining  { background: #e67e22; }
+    .poi-bus     { background: #2196F3; }
+
+    /* ── POI Popup styling ────────────────────────────────────────────── */
+    .maplibregl-popup-content {
+      background: #1a2e24 !important;
+      color: #e0e8e4 !important;
+      border-radius: 12px !important;
+      padding: 0 !important;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4) !important;
+      border: 1px solid rgba(255,255,255,0.1) !important;
+      overflow: hidden;
+      font-family: 'Inter', sans-serif !important;
+    }
+    .maplibregl-popup-close-button {
+      color: rgba(255,255,255,0.4) !important;
+      font-size: 18px !important;
+      right: 8px !important;
+      top: 6px !important;
+    }
+    .maplibregl-popup-close-button:hover {
+      color: white !important;
+      background: transparent !important;
+    }
+    .maplibregl-popup-tip {
+      border-top-color: #1a2e24 !important;
+    }
+
+    .poi-popup {
+      display: flex;
+      gap: 12px;
+      padding: 14px 16px;
+      align-items: flex-start;
+    }
+    .poi-popup-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-weight: 800; font-size: 14px; flex-shrink: 0;
+    }
+    .poi-parking-bg { background: #7b4fbf; }
+    .poi-dining-bg  { background: #e67e22; }
+    .poi-bus-bg     { background: #2196F3; }
+
+    .poi-popup-body { flex: 1; min-width: 0; }
+    .poi-popup-body strong {
+      display: block; font-size: 14px; font-weight: 700;
+      color: white; margin-bottom: 4px;
+    }
+    .poi-popup-body p {
+      font-size: 12px; color: rgba(255,255,255,0.6);
+      line-height: 1.5; margin: 0 0 4px;
+    }
+    .poi-hours {
+      font-size: 11px !important;
+      color: rgba(78,202,136,0.9) !important;
+      font-weight: 500;
+    }
+    .poi-note {
+      font-size: 11px !important;
+      color: rgba(255,255,255,0.4) !important;
+      font-style: italic;
+    }
+    .poi-popup-links {
+      display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;
+    }
+    .poi-popup-links a {
+      font-size: 11px; font-weight: 600;
+      color: #4eca88;
+      text-decoration: none;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: rgba(0,201,120,0.1);
+      border: 1px solid rgba(0,201,120,0.2);
+      transition: all 0.2s;
+    }
+    .poi-popup-links a:hover {
+      background: rgba(0,201,120,0.2);
+      color: white;
+    }
+
+    /* ── Building name markers on map ────────────────────────────────── */
+    .building-marker {
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      pointer-events: auto;
+      text-align: center;
+      line-height: 1.2;
+    }
+    .bm-code {
+      font-size: 12px;
+      font-weight: 800;
+      color: #1a2a20;
+      text-shadow: 0 0 4px rgba(255,255,255,0.95), 0 0 2px rgba(255,255,255,1);
+      letter-spacing: 0.02em;
+    }
+    .bm-name {
+      display: block;
+      font-size: 9px;
+      font-weight: 600;
+      color: #3a4a40;
+      text-shadow: 0 0 3px rgba(255,255,255,0.9), 0 0 1px rgba(255,255,255,1);
+      max-width: 80px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ── Floating GO button ─────────────────────────────────────────── */
+    #go-fab {
+      position: absolute;
+      bottom: 28px;
+      right: 24px;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 22px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 999px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(0,90,67,0.4), 0 2px 8px rgba(0,0,0,0.15);
+      transition: all 0.25s;
+      animation: fade-in 0.5s ease 1s both;
+    }
+    #go-fab:hover {
+      background: #007a54;
+      box-shadow: 0 6px 28px rgba(0,90,67,0.5), 0 2px 8px rgba(0,0,0,0.2);
+      transform: translateY(-1px);
+    }
+    #go-fab:active { transform: translateY(0); }
+    .go-fab-icon { font-size: 16px; }
+
+    /* ── Navigation steps in info panel ──────────────────────────────── */
+    #panel-nav { display: none; }
+    .nav-label {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--text-muted); margin-bottom: 12px;
+    }
+    .nav-step {
+      display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px;
+    }
+    .nav-step:last-child { margin-bottom: 0; }
+    .step-num {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: rgba(0,201,120,0.1); border: 1px solid rgba(0,201,120,0.25);
+      color: var(--accent-bright); font-size: 11px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .step-text {
+      font-size: 13px; color: var(--text-secondary); line-height: 1.5; padding-top: 2px;
+    }
+    .step-text strong { color: var(--text-primary); font-weight: 600; }
+    .step-detail {
+      font-size: 11px; color: var(--text-muted);
+    }
+
+    /* ── Route markers ────────────────────────────────────────────────── */
+    .route-dot {
+      width: 18px; height: 18px; border-radius: 50%;
+      border: 3px solid white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+      cursor: default;
+    }
+    .route-dot-start { background: #00c978; }
+    .route-dot-end { background: #ff7b54; }
+
+    /* ── GO Navigation Panel ──────────────────────────────────────────── */
+    #go-modal {
+      position: absolute;
+      top: 84px; left: 24px;
+      z-index: 50;
+      width: 340px;
+      background: rgba(18,22,26,0.94);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      border: 1px solid var(--glass-border);
+      border-radius: 14px;
+      padding: 0;
+      opacity: 0; pointer-events: none;
+      transform: translateX(-20px);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 8px 40px rgba(0,0,0,0.45);
+      overflow: hidden;
+    }
+    #go-modal.visible {
+      opacity: 1; pointer-events: auto;
+      transform: translateX(0);
+    }
+
+    .go-header {
+      display: flex; align-items: center;
+      padding: 14px 14px 0;
+    }
+    .go-header h3 {
+      font-size: 14px; font-weight: 700; color: var(--text-primary); flex: 1;
+      margin: 0;
+    }
+    #go-close {
+      background: none; border: none; color: var(--text-muted);
+      cursor: pointer; width: 24px; height: 24px; border-radius: 6px;
+      font-size: 13px; display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s;
+    }
+    #go-close:hover { background: rgba(255,255,255,0.1); color: white; }
+
+    /* ── From / To fields ── */
+    .go-fields {
+      display: flex; padding: 12px 14px 10px; gap: 0;
+    }
+    .go-waypoints {
+      display: flex; flex-direction: column; align-items: center;
+      width: 24px; flex-shrink: 0; padding-top: 12px;
+    }
+    .go-dot-from {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--accent-bright); flex-shrink: 0;
+    }
+    .go-dot-line {
+      width: 2px; flex: 1; min-height: 12px;
+      background: rgba(255,255,255,0.12);
+      margin: 3px 0;
+    }
+    .go-dot-to {
+      width: 10px; height: 10px; border-radius: 2px;
+      background: #ff7b54; flex-shrink: 0;
+    }
+    .go-inputs { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+
+    .go-field-input {
+      width: 100%;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 9px 12px;
+      color: var(--text-primary);
+      font-size: 13px; font-family: inherit; font-weight: 500;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .go-field-input::placeholder { color: var(--text-muted); font-weight: 400; }
+    .go-field-input:focus { border-color: rgba(0,201,120,0.5); }
+    .go-field-input.has-value {
+      background: rgba(0,201,120,0.06);
+      border-color: rgba(0,201,120,0.15);
+    }
+
+    /* ── Search results dropdown ── */
+    .go-dropdown {
+      display: none;
+      max-height: 200px; overflow-y: auto;
+      border-top: 1px solid rgba(255,255,255,0.05);
+    }
+    .go-result-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; cursor: pointer;
+      transition: background 0.12s;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+    .go-result-item:last-child { border-bottom: none; }
+    .go-result-item:hover { background: rgba(0,201,120,0.08); }
+    .go-result-icon {
+      width: 28px; height: 28px; border-radius: 7px;
+      background: rgba(255,255,255,0.06);
+      color: var(--accent-bright);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; flex-shrink: 0;
+    }
+    .go-result-icon.myloc { background: rgba(0,201,120,0.12); }
+    .go-result-name {
+      font-size: 13px; font-weight: 600; color: var(--text-primary);
+    }
+    .go-result-sub {
+      font-size: 11px; color: var(--text-muted); margin-top: 1px;
+    }
+
+    /* ── Directions panel (inside go-modal) ── */
+    #go-directions {
+      display: none;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      padding: 12px 14px;
+    }
+    .dir-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .dir-summary {
+      display: flex; align-items: baseline; gap: 8px;
+    }
+    .dir-dist {
+      font-size: 20px; font-weight: 800; color: var(--accent-bright);
+    }
+    .dir-time {
+      font-size: 13px; color: var(--text-muted); font-weight: 500;
+    }
+    #go-clear {
+      background: none; border: none;
+      color: var(--text-muted); cursor: pointer;
+      font-size: 11px; font-weight: 600; font-family: inherit;
+      padding: 4px 8px; border-radius: 6px;
+      transition: all 0.2s;
+    }
+    #go-clear:hover { color: #ff6b6b; }
+
+    #nav-stop-btn {
+      margin-top: 10px;
+      width: 100%;
+      padding: 8px;
+      background: rgba(255,80,80,0.08);
+      border: 1px solid rgba(255,80,80,0.18);
+      color: #ff6b6b;
+      font-size: 12px; font-weight: 700; font-family: inherit;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    #nav-stop-btn:hover { background: rgba(255,80,80,0.15); }
+
+    .arrived-banner {
+      padding: 12px; margin-bottom: 10px;
+      background: rgba(0,201,120,0.1);
+      border: 1px solid rgba(0,201,120,0.2);
+      border-radius: 8px;
+      text-align: center;
+    }
+    .arrived-banner .arrived-icon { font-size: 22px; }
+    .arrived-banner .arrived-text {
+      font-size: 13px; font-weight: 700; color: var(--accent-bright);
+      margin-top: 2px;
+    }
+
+    /* ── Mapbox overrides ────────────────────────────────────────────────── */
+    .maplibregl-ctrl-group {
+      background: var(--glass) !important;
+      backdrop-filter: var(--blur) !important;
+      -webkit-backdrop-filter: var(--blur) !important;
+      border: 1px solid var(--glass-border) !important;
+      border-radius: var(--radius-sm) !important;
+      box-shadow: var(--shadow) !important;
+    }
+    .maplibregl-ctrl-group button {
+      background: transparent !important;
+      border-color: rgba(255,255,255,0.06) !important;
+    }
+    .maplibregl-ctrl-group button:hover {
+      background: rgba(255,255,255,0.08) !important;
+    }
+    .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+      filter: invert(1) brightness(0.8);
+    }
+    .maplibregl-ctrl-scale {
+      background: var(--glass) !important;
+      backdrop-filter: var(--blur) !important;
+      color: var(--text-secondary) !important;
+      border-color: rgba(255,255,255,0.2) !important;
+      border-radius: 6px !important;
+      font-family: 'Inter', sans-serif !important;
+      font-size: 10px !important;
+      padding: 2px 8px !important;
+    }
+    .maplibregl-user-location-dot {
+      box-shadow: 0 0 0 4px rgba(0,201,120,0.3) !important;
+    }
+    .maplibregl-user-location-dot::before {
+      background-color: var(--accent-bright) !important;
+    }
+
+    /* ── Scrollbar ───────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+    /* ── Responsive ──────────────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      #header { padding: 8px 16px 8px 10px; gap: 10px; }
+      #header .header-text h1 { font-size: 13px; }
+      #search-box { width: 220px; left: 12px; top: 76px; }
+      #info-panel { width: 280px; right: 12px; top: 76px; }
+      #legend { left: 12px; bottom: 16px; }
+      #controls-hint { display: none; }
+      #layers-panel { top: 128px; left: 12px; }
+      #go-fab { bottom: 16px; right: 12px; }
+      #go-modal { width: calc(100vw - 24px); top: 76px; left: 12px; }
+    }
+  </style>
+  <script type="module" crossorigin src="/BU-Map/assets/index-B08RTrhk.js"></script>
+  <link rel="stylesheet" crossorigin href="/BU-Map/assets/index-B46vZ9Yf.css">
+</head>
+<body>
+  <!-- Loading screen -->
+  <div id="loading">
+    <div class="logo-big">BU</div>
+    <h2>Binghamton University</h2>
+    <div class="loader-bar"><div class="fill"></div></div>
+  </div>
+
+  <!-- Map container -->
+  <div id="map">
+    <!-- Header -->
+    <div id="header">
+      <div class="logo">BU</div>
+      <div class="header-text">
+        <h1>Binghamton University</h1>
+        <p>Campus Map &middot; Vestal, NY</p>
+      </div>
+    </div>
+
+    <!-- Info panel -->
+    <div id="info-panel">
+      <div class="panel-accent-bar" id="panel-accent"></div>
+      <div class="panel-content">
+        <button class="close-btn" id="close-btn">&#x2715;</button>
+        <div class="building-tag" id="panel-tag">Building</div>
+        <h2 id="panel-name">Building Name</h2>
+        <div class="divider"></div>
+        <div class="stats-row">
+          <div class="stat-block">
+            <div class="stat-icon">&#x25A3;</div>
+            <div class="stat-value" id="panel-floors">&mdash;</div>
+            <div class="stat-label">Floors</div>
+          </div>
+          <div class="stat-block">
+            <div class="stat-icon">&#x2302;</div>
+            <div class="stat-value" id="panel-type">&mdash;</div>
+            <div class="stat-label">Type</div>
+          </div>
+          <div class="stat-block">
+            <div class="stat-icon">&#x2316;</div>
+            <div class="stat-value" id="panel-address">&mdash;</div>
+            <div class="stat-label">Code</div>
+          </div>
+        </div>
+        <p class="description" id="panel-desc"></p>
+
+        <div id="panel-nav">
+          <div class="divider"></div>
+          <div class="nav-label">Getting There</div>
+          <div id="panel-nav-steps"></div>
+        </div>
+
+        <div class="panel-actions">
+          <button class="btn-primary" id="btn-go">
+            <span style="margin-right:4px">&#x2794;</span> Navigate Here
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search -->
+    <div id="search-box">
+      <div class="search-wrap">
+        <span class="search-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+        <input id="search-input" type="text" placeholder="Search buildings, rooms..." autocomplete="off" spellcheck="false" />
+        <span class="search-shortcut" id="search-shortcut-hint">/</span>
+      </div>
+      <div id="search-results"></div>
+    </div>
+
+    <!-- Layers Panel -->
+    <div id="layers-panel">
+      <button class="layers-toggle-btn" id="layers-btn">
+        <span class="icon">&#x25A6;</span>
+        Layers
+      </button>
+      <div class="layers-dropdown" id="layers-dropdown">
+        <h4>Show / Hide Layers</h4>
+        <div class="layer-toggle active" data-layer="parking">
+          <div class="layer-info">
+            <div class="layer-dot" style="background:#7b4fbf"></div>
+            <span class="layer-name">Parking</span>
+          </div>
+          <span class="toggle-status">ON</span>
+        </div>
+        <div class="layer-toggle active" data-layer="dining">
+          <div class="layer-info">
+            <div class="layer-dot" style="background:#e67e22"></div>
+            <span class="layer-name">Dining</span>
+          </div>
+          <span class="toggle-status">ON</span>
+        </div>
+        <div class="layer-toggle active" data-layer="bus">
+          <div class="layer-info">
+            <div class="layer-dot" style="background:#2196F3"></div>
+            <span class="layer-name">Bus Stops</span>
+          </div>
+          <span class="toggle-status">ON</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div id="legend">
+      <h3>Building Types</h3>
+      <div id="legend-items"></div>
+    </div>
+
+    <!-- Controls -->
+    <div id="controls-hint">
+      <div class="hint-chip"><span class="hint-key">Drag</span> Pan</div>
+      <div class="hint-chip"><span class="hint-key">Scroll</span> Zoom</div>
+      <div class="hint-chip"><span class="hint-key">Right-drag</span> Rotate</div>
+      <div class="hint-chip"><span class="hint-key">Click</span> Select</div>
+      <div class="hint-chip"><span class="hint-key">/</span> Search</div>
+    </div>
+
+    <div id="tooltip"></div>
+
+    <!-- Floating GO button -->
+    <button id="go-fab" title="Navigate to a building or room">
+      <span class="go-fab-icon">&#x2794;</span>
+      <span>Go</span>
+    </button>
+
+    <!-- GO Navigation Panel -->
+    <div id="go-modal">
+      <div class="go-header">
+        <h3>Directions</h3>
+        <button id="go-close">&#x2715;</button>
+      </div>
+      <div class="go-fields">
+        <div class="go-waypoints">
+          <div class="go-dot-from"></div>
+          <div class="go-dot-line"></div>
+          <div class="go-dot-to"></div>
+        </div>
+        <div class="go-inputs">
+          <input id="go-from-input" class="go-field-input" type="text" value="My Location" placeholder="Starting point..." autocomplete="off" spellcheck="false" />
+          <input id="go-input" class="go-field-input" type="text" placeholder="Destination (building or room)" autocomplete="off" spellcheck="false" />
+        </div>
+      </div>
+      <div id="go-from-results" class="go-dropdown"></div>
+      <div id="go-results" class="go-dropdown"></div>
+      <div id="go-directions">
+        <div class="dir-header">
+          <div class="dir-summary">
+            <span class="dir-dist" id="nav-live-dist">--</span>
+            <span class="dir-time" id="nav-live-time"></span>
+          </div>
+          <button id="go-clear">Clear</button>
+        </div>
+        <div id="go-steps"></div>
+        <button id="nav-stop-btn" style="display:none">Stop Navigation</button>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
