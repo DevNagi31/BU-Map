@@ -377,6 +377,7 @@ map.on('load', () => {
     // Click label to open info panel
     el.addEventListener('click', (e) => {
       e.stopPropagation();
+      if (goModal.classList.contains('visible')) return;
       showBuilding(props);
       flyToBuilding(props.code);
     });
@@ -468,6 +469,8 @@ map.on('load', () => {
 
   // Building click — use queryRenderedFeatures for reliable hit detection
   map.on('click', (e) => {
+    // Don't show info panel when Go modal is open
+    if (goModal.classList.contains('visible')) return;
     const features = map.queryRenderedFeatures(e.point, { layers: ['bu-buildings-3d'] });
     if (features.length) {
       const props = features[0].properties;
@@ -583,7 +586,7 @@ function showBuilding(props, room = null) {
 function closeInfoPanel() {
   infoPanel.classList.remove('visible');
   currentBuildingCode = null;
-  clearRoute();
+  if (!navActive) clearRoute();
 }
 
 document.getElementById('close-btn').addEventListener('click', closeInfoPanel);
@@ -702,6 +705,12 @@ function openGoModal(prefill = false) {
   pendingToResult = null;
   setFromMyLocation();
 
+  // Hide overlapping UI elements
+  closeInfoPanel();
+  document.getElementById('search-box').style.display = 'none';
+  document.getElementById('layers-panel').style.display = 'none';
+  document.getElementById('go-fab').style.display = 'none';
+
   if (prefill && lastSelectedBuilding) {
     const b = allBuildings.find(ab => ab.code === lastSelectedBuilding.code);
     if (b) {
@@ -723,13 +732,19 @@ function openGoModal(prefill = false) {
   setTimeout(() => goInput.focus(), 100);
 }
 
+function closeGoModal() {
+  goModal.classList.remove('visible');
+  stopNavigation();
+  // Restore hidden UI elements
+  document.getElementById('search-box').style.display = '';
+  document.getElementById('layers-panel').style.display = '';
+  document.getElementById('go-fab').style.display = '';
+}
+
 document.getElementById('btn-go').addEventListener('click', () => openGoModal(true));
 document.getElementById('go-fab').addEventListener('click', () => openGoModal(false));
 
-goClose.addEventListener('click', () => {
-  goModal.classList.remove('visible');
-  stopNavigation();
-});
+goClose.addEventListener('click', closeGoModal);
 
 goClear.addEventListener('click', () => {
   stopNavigation();
